@@ -29,7 +29,7 @@ from qtpy.QtWidgets import (
     QPlainTextEdit,  # 新增：用于日志显示
 )
 
-import Celltrackeditor.src.core_logic as core_logic
+import src.core_logic as core_logic
 
 
 class CTCEditorWidget(QWidget):

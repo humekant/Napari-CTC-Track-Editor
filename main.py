@@ -1,5 +1,7 @@
 import napari
-from src.widgets_en import CTCEditorWidget
+from src.widgets_cn import CTCEditorWidget
+
+# from src.widgets_en import CTCEditorWidget
 
 
 def main():
