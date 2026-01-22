@@ -29,7 +29,7 @@ from qtpy.QtWidgets import (
     QPlainTextEdit,
 )
 
-import Celltrackeditor.src.core_logic as core_logic
+import src.core_logic as core_logic
 
 
 class CTCEditorWidget(QWidget):
@@ -53,7 +53,7 @@ class CTCEditorWidget(QWidget):
         self._connect_signals()
 
         # Initialize Log
-        self.log_message("Plugin started. Waiting for data...", "info")
+        self.log_message("Plugin started. Waiting for data loading...", "info")
 
     def _init_ui(self):
         self.main_layout = QVBoxLayout()
@@ -70,12 +70,12 @@ class CTCEditorWidget(QWidget):
 
         path_layout.addWidget(QLabel("Raw Path:"), 1, 0)
         self.edit_raw_path = QLineEdit()
-        self.edit_raw_path.setPlaceholderText("Auto-detect 01/02 if empty")
+        self.edit_raw_path.setPlaceholderText("Leave empty to auto-find 01/02 folder")
         path_layout.addWidget(self.edit_raw_path, 1, 1)
         self.btn_browse_raw = QPushButton("Browse")
         path_layout.addWidget(self.btn_browse_raw, 1, 2)
 
-        self.btn_load = QPushButton("🚀 Async Load Data")
+        self.btn_load = QPushButton("🚀 High-Speed Async Load")
         self.btn_load.setStyleSheet(
             "font-weight: bold; height: 32px; background-color: #2c3e50; color: white;"
         )
@@ -113,7 +113,7 @@ class CTCEditorWidget(QWidget):
 
         # 3 & 4. Editing Tools
         grid_container = QGridLayout()
-        grid_container.addWidget(QLabel("<b>[ 3. Editing Tools ]</b>"), 0, 0)
+        grid_container.addWidget(QLabel("<b>[ 3. Edit Tools ]</b>"), 0, 0)
         grid_container.addWidget(QLabel("Keep ID:"), 1, 0)
         self.spin_m_keep = QSpinBox()
         self.spin_m_keep.setRange(0, 99999)
@@ -124,17 +124,19 @@ class CTCEditorWidget(QWidget):
         grid_container.addWidget(self.spin_m_del, 2, 1)
         self.btn_merge = QPushButton("🤝 Merge Tracks")
         grid_container.addWidget(self.btn_merge, 3, 0, 1, 2)
+
         grid_container.addWidget(QLabel("Split ID:"), 4, 0)
         self.spin_s_id = QSpinBox()
         self.spin_s_id.setRange(0, 99999)
         grid_container.addWidget(self.spin_s_id, 4, 1)
-        grid_container.addWidget(QLabel("Start T:"), 5, 0)
+        grid_container.addWidget(QLabel("From T:"), 5, 0)
         self.spin_s_time = QSpinBox()
         self.spin_s_time.setRange(0, 99999)
         grid_container.addWidget(self.spin_s_time, 5, 1)
         self.btn_split = QPushButton("✂️ Split as New")
         grid_container.addWidget(self.btn_split, 6, 0, 1, 2)
-        grid_container.addWidget(QLabel("Parent P:"), 7, 0)
+
+        grid_container.addWidget(QLabel("Parent:"), 7, 0)
         self.spin_p = QSpinBox()
         self.spin_p.setRange(0, 99999)
         grid_container.addWidget(self.spin_p, 7, 1)
@@ -149,21 +151,22 @@ class CTCEditorWidget(QWidget):
         self.btn_link = QPushButton("🔗 Link Lineage")
         grid_container.addWidget(self.btn_link, 10, 0, 1, 2)
 
-        grid_container.addWidget(QLabel("<b>[ 4. System & Helpers ]</b>"), 0, 2)
+        grid_container.addWidget(QLabel("<b>[ 4. System & Aux ]</b>"), 0, 2)
         grid_container.addWidget(QLabel("Target ID:"), 1, 2)
         self.spin_target_del = QSpinBox()
         self.spin_target_del.setRange(0, 99999)
         grid_container.addWidget(self.spin_target_del, 1, 3)
-        self.btn_del_all = QPushButton("❌ Delete All")
+        self.btn_del_all = QPushButton("❌ Delete Track")
         grid_container.addWidget(self.btn_del_all, 2, 2, 1, 2)
-        self.btn_del_after = QPushButton("✂️ Delete After")
+        self.btn_del_after = QPushButton("✂️ Delete After T")
         grid_container.addWidget(self.btn_del_after, 3, 2, 1, 2)
         self.btn_undo = QPushButton("↩️ Undo Action")
         grid_container.addWidget(self.btn_undo, 5, 2, 1, 2)
-        self.btn_refresh = QPushButton("✨ Refresh 3D")
+        self.btn_refresh = QPushButton("✨ Refresh Tracks")
         grid_container.addWidget(self.btn_refresh, 6, 2, 1, 2)
-        grid_container.addWidget(QLabel("<b>[ 5. Export ]</b>"), 8, 2)
-        self.btn_save_over = QPushButton("💾 Save (Over)")
+
+        grid_container.addWidget(QLabel("<b>[ 5. Save ]</b>"), 8, 2)
+        self.btn_save_over = QPushButton("💾 Overwrite RES")
         grid_container.addWidget(self.btn_save_over, 9, 2, 1, 2)
         self.btn_save_as = QPushButton("📁 Save As...")
         grid_container.addWidget(self.btn_save_as, 10, 2, 1, 2)
@@ -172,8 +175,8 @@ class CTCEditorWidget(QWidget):
 
         self._add_line()
 
-        # --- System Log Console ---
-        self.main_layout.addWidget(QLabel("<b>[ 6. System Log ]</b>"))
+        # --- Console Logs ---
+        self.main_layout.addWidget(QLabel("<b>[ 6. System Logs ]</b>"))
         self.log_console = QPlainTextEdit()
         self.log_console.setReadOnly(True)
         self.log_console.setFixedHeight(120)
@@ -188,7 +191,6 @@ class CTCEditorWidget(QWidget):
         """
         )
         self.main_layout.addWidget(self.log_console)
-
         self.main_layout.addStretch()
 
     def _add_line(self):
@@ -198,9 +200,8 @@ class CTCEditorWidget(QWidget):
         self.main_layout.addWidget(line)
 
     def log_message(self, message, level="info"):
-        """System log output supporting HTML colors"""
+        """Output system logs with HTML color support"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-
         colors = {
             "info": "#cccccc",
             "success": "#4ec9b0",
@@ -208,7 +209,6 @@ class CTCEditorWidget(QWidget):
             "error": "#f44747",
         }
         color = colors.get(level, "#cccccc")
-
         html_msg = f'<span style="color:#666666;">[{timestamp}]</span> <span style="color:{color};">{message}</span>'
 
         self.log_console.appendHtml(html_msg)
@@ -245,7 +245,7 @@ class CTCEditorWidget(QWidget):
         self.viewer.dims.events.current_step.connect(self.update_info_table)
 
     def _read_image_folder(self, folder_path):
-        """Read images: .tif via tifffile, others via imageio"""
+        """Read images: .tif with tifffile, others with imageio"""
         if not folder_path or not Path(folder_path).exists():
             return None
 
@@ -271,17 +271,14 @@ class CTCEditorWidget(QWidget):
 
         if not img_list:
             return None
-
         return np.stack(img_list)
 
     @thread_worker
     def _full_load_worker(self, mask_path, raw_path_input):
-        # 1. Load Mask via core_logic
         mask_stack = core_logic.read_image_folder(mask_path)
         if mask_stack is None:
             return None
 
-        # 2. Infer Raw path
         raw_stack = None
         mask_p = Path(mask_path).parent
         if raw_path_input and Path(raw_path_input).exists():
@@ -293,13 +290,13 @@ class CTCEditorWidget(QWidget):
                 if auto_path.exists():
                     raw_stack = core_logic.read_image_folder(auto_path)
 
-        # 3. Compute stats
+        # Statistical calculations
         stats, cents, f2ids = {}, {}, {t: [] for t in range(len(mask_stack))}
         for t in range(len(mask_stack)):
             f2ids[t] = core_logic.scan_frame_for_stats(t, mask_stack[t], stats, cents)
             yield ("progress", int((t + 1) / len(mask_stack) * 100))
 
-        # 4. Load Lineage
+        # Read Lineage
         lin = {}
         for fn in ["res_track.txt", "man_track.txt"]:
             txt = Path(mask_path) / fn
@@ -318,7 +315,7 @@ class CTCEditorWidget(QWidget):
     def _on_load_clicked(self):
         p_str = self.edit_mask_path.text()
         if not p_str:
-            self.log_message("Mask path not selected, load cancelled", "warning")
+            self.log_message("Mask path not selected, load cancelled.", "warning")
             return
 
         self.data_path = Path(p_str)
@@ -337,14 +334,14 @@ class CTCEditorWidget(QWidget):
 
     def _on_load_finished(self, result):
         if result is None:
-            self.log_message("No valid image files found! Check path.", "error")
-            show_info("❌ No valid image files found!")
+            self.log_message("No valid image files found! Check your path.", "error")
+            show_info("❌ No valid images found!")
             self.btn_load.setEnabled(True)
             return
 
         mask, raw, stats, cents, f2ids, lin = result
 
-        for name in ["RawImage", "SegLabels", "LineageTracks"]:
+        for name in ["RawImage", "SegLabels", "LineageTracks", "ID_Labels"]:
             if name in self.viewer.layers:
                 self.viewer.layers.remove(name)
 
@@ -354,7 +351,7 @@ class CTCEditorWidget(QWidget):
             )
             self.log_message("Raw image layer loaded", "info")
         else:
-            self.log_message("Raw image not found, displaying Mask only", "warning")
+            self.log_message("Raw images not found, displaying Mask only", "warning")
 
         self.labels_layer = self.viewer.add_labels(mask, name="SegLabels", opacity=0.5)
         self.labels_layer.show_label_index = True
@@ -373,11 +370,11 @@ class CTCEditorWidget(QWidget):
         self.update_tracks_layer()
 
         self.log_message(
-            f"Load complete: {len(mask)} frames, {len(stats)} cell IDs", "success"
+            f"Loading complete: {len(mask)} frames, {len(stats)} cell IDs", "success"
         )
         if lin:
             self.log_message(f"Loaded {len(lin)} division records", "success")
-        show_info("✅ Data load complete")
+        show_info("✅ Data loading complete")
 
     def update_info_table(self, event=None):
         if not self.frame_to_ids:
@@ -426,14 +423,14 @@ class CTCEditorWidget(QWidget):
         self.viewer.dims.set_current_step(0, self.track_stats[next_id][0])
 
     def update_tracks_layer(self):
-        """Update tracks display and show custom IDs (Parent-Child) using Points layer"""
+        """Update track visuals and point layer with custom ID labels (Parent-Child)"""
         if not self.centroids_cache:
             for name in ["LineageTracks", "ID_Labels"]:
                 if name in self.viewer.layers:
                     self.viewer.layers.remove(name)
             return
 
-        # 1. Track data (ID, T, Y, X)
+        # 1. Track Layer Data (ID, T, Y, X)
         pts_list = []
         for (t, tid), (y, x) in self.centroids_cache.items():
             pts_list.append([int(tid), int(t), y, x])
@@ -448,7 +445,6 @@ class CTCEditorWidget(QWidget):
             if c in pts[:, 0] and p in pts[:, 0]
         }
 
-        # Create or update tracks layer
         if "LineageTracks" in self.viewer.layers:
             layer_tr = self.viewer.layers["LineageTracks"]
             layer_tr.data = pts
@@ -460,7 +456,7 @@ class CTCEditorWidget(QWidget):
 
         layer_tr.display_id = False
 
-        # 2. Construct text labels
+        # 2. Text Label Data
         label_coords = []
         display_texts = []
         for (t, tid), (y, x) in self.centroids_cache.items():
@@ -472,7 +468,7 @@ class CTCEditorWidget(QWidget):
 
         pt_props = {"label_text": np.array(display_texts)}
 
-        # 3. Points layer for labels
+        # 3. Update or create Points Layer for labels
         if "ID_Labels" in self.viewer.layers:
             layer_lab = self.viewer.layers["ID_Labels"]
             layer_lab.data = np.array(label_coords)
@@ -498,7 +494,6 @@ class CTCEditorWidget(QWidget):
                 face_color="transparent",
             )
 
-        # 4. Force redraw
         layer_tr.refresh()
         if "ID_Labels" in self.viewer.layers:
             self.viewer.layers["ID_Labels"].refresh()
@@ -538,7 +533,7 @@ class CTCEditorWidget(QWidget):
     def merge_tracks_action(self):
         id_keep, id_src = self.spin_m_keep.value(), self.spin_m_del.value()
         if id_keep == 0 or id_src == 0 or id_keep == id_src:
-            self.log_message("Merge failed: IDs invalid or identical", "error")
+            self.log_message("Merge failed: Invalid or duplicate IDs", "error")
             return
 
         self._save_history()
@@ -547,13 +542,14 @@ class CTCEditorWidget(QWidget):
         self.labels_layer.data[self.labels_layer.data == id_src] = id_keep
         self.labels_layer.refresh()
 
-        # Update lineage
+        # Inherit lineage
+        for child, parent in list(self.lineage_data.items()):
+            if parent == id_src:
+                self.lineage_data[child] = id_keep
         if id_src in self.lineage_data:
-            parent_id = self.lineage_data.pop(id_src)
-            self.lineage_data[id_keep] = parent_id
+            self.lineage_data.pop(id_src)
 
-        # Recompute
-        self._recompute_stats_simple()
+        self._refresh_cache_from_memory()
         self.update_info_table()
         self.update_tracks_layer()
         self.log_message(f"Merge successful: ID {id_src} into ID {id_keep}", "success")
@@ -563,45 +559,114 @@ class CTCEditorWidget(QWidget):
         if old_id == 0 or old_id not in self.track_stats:
             self.log_message("Split failed: ID does not exist", "error")
             return
+
         self._save_history()
+
+        # Generate new ID
         new_id = int(max(self.track_stats.keys()) + 1)
         data_view = self.labels_layer.data[t_start:, ...]
-        data_view[data_view == old_id] = new_id
+        mask_to_change = data_view == old_id
+
+        if not np.any(mask_to_change):
+            self.log_message(
+                f"Warning: No pixels found for ID {old_id} at T >= {t_start}", "warning"
+            )
+            return
+
+        data_view[mask_to_change] = new_id
         self.labels_layer.refresh()
-        old_end = self.track_stats[old_id][1]
-        self.track_stats[old_id][1] = t_start - 1
-        self.track_stats[new_id] = [t_start, old_end]
+
+        # Transfer children
+        updated_children = []
+        for child_id, parent_id in list(self.lineage_data.items()):
+            if parent_id == old_id:
+                child_start_frame = self.track_stats.get(child_id, [0, 0])[0]
+                if child_start_frame >= t_start:
+                    self.lineage_data[child_id] = new_id
+                    updated_children.append(str(child_id))
+
+        self._refresh_cache_from_memory()
         self.update_info_table()
         self.update_tracks_layer()
-        self.log_message(
-            f"Split successful: ID {old_id} split to new ID {new_id} at T={t_start}",
-            "success",
-        )
+
+        msg = f"Split successful: ID {old_id} -> New ID {new_id} (at Frame {t_start})"
+        if updated_children:
+            msg += f" | Children transferred: {', '.join(updated_children)}"
+        self.log_message(msg, "success")
+
+    def _refresh_cache_from_memory(self):
+        """Full re-calculation of caches from memory data"""
+        self.log_message("Refreshing memory caches...", "info")
+
+        mask_data = self.labels_layer.data
+        num_frames = mask_data.shape[0]
+
+        new_stats = {}
+        new_cents = {}
+        new_f2ids = {t: [] for t in range(num_frames)}
+
+        for t in range(num_frames):
+            frame = mask_data[t]
+            uids = np.unique(frame)
+            uids = uids[uids > 0]
+
+            if len(uids) == 0:
+                continue
+
+            new_f2ids[t] = [int(u) for u in uids]
+            centers = center_of_mass(frame, frame, uids)
+
+            for idx, uid in enumerate(uids):
+                uid = int(uid)
+                y, x = centers[idx]
+                new_cents[(t, uid)] = (y, x)
+                if uid not in new_stats:
+                    new_stats[uid] = [t, t]
+                else:
+                    new_stats[uid][1] = t
+
+        self.track_stats = new_stats
+        self.centroids_cache = new_cents
+        self.frame_to_ids = new_f2ids
+
+        # Cleanup lineage for removed IDs
+        valid_ids = set(new_stats.keys())
+        keys_to_remove = [k for k in self.lineage_data if k not in valid_ids]
+        for k in keys_to_remove:
+            del self.lineage_data[k]
+
+        self.log_message("Memory cache refreshed", "info")
 
     def delete_track_globally(self):
         tid = self.spin_target_del.value()
         if tid == 0:
             return
         self._save_history()
+
         self.labels_layer.data[self.labels_layer.data == tid] = 0
         self.labels_layer.refresh()
-        self.track_stats.pop(tid, None)
+
+        if tid in self.lineage_data:
+            del self.lineage_data[tid]
+
+        self._refresh_cache_from_memory()
         self.update_info_table()
         self.update_tracks_layer()
-        self.log_message(f"Physically deleted all pixels of ID {tid}", "warning")
+        self.log_message(f"Physically deleted ID {tid}", "warning")
 
     def delete_track_afterwards(self):
         tid, t_curr = self.spin_target_del.value(), self.viewer.dims.current_step[0]
         if tid == 0:
             return
         self._save_history()
+
         self.labels_layer.data[t_curr:][self.labels_layer.data[t_curr:] == tid] = 0
         self.labels_layer.refresh()
-        if tid in self.track_stats:
-            self.track_stats[tid][1] = t_curr - 1
+
+        self._refresh_cache_from_memory()
         self.update_info_table()
         self.update_tracks_layer()
-        self.log_message(f"Truncated ID {tid} starting from frame {t_curr}", "warning")
+        self.log_message(f"Truncated ID {tid} starting from Frame {t_curr}", "warning")
 
     def link_lineage_batch(self):
         p = self.spin_p.value()
@@ -622,29 +687,24 @@ class CTCEditorWidget(QWidget):
                 count += 1
 
         if count > 0:
-            msg = (
-                f"Lineage established: Parent {p} -> Child {', '.join(linked_children)}"
-            )
+            msg = f"Lineage linked: Parent {p} -> Children {', '.join(linked_children)}"
             show_info(f"✅ {msg}")
             self.log_message(msg, "success")
             self.update_info_table()
             self.update_tracks_layer()
         else:
-            self.log_message(
-                "Lineage failed: No valid child IDs or child same as parent", "warning"
-            )
+            self.log_message("Lineage failed: No valid child IDs specified", "warning")
 
     def _execute_save(self, output_dir):
-        """Save logic: Sync images and lineage data to CTC format"""
+        """Deep sync save: write images and L B E P text files"""
         try:
             output_dir.mkdir(exist_ok=True, parents=True)
             self.log_message(f"Saving data to: {output_dir} ...", "info")
-            show_info("Executing deep sync save (including lineage)...")
+            show_info("Executing deep sync save (with lineage)...")
 
             mask_data = self.labels_layer.data
             num_frames = mask_data.shape[0]
 
-            # 1. Scan images to rebuild stats
             new_stats = {}
             for t in range(num_frames):
                 frame = mask_data[t]
@@ -663,76 +723,48 @@ class CTCEditorWidget(QWidget):
                     else:
                         new_stats[uid][1] = t
 
-            # 2. Construct TXT content: L B E P
             tlines = []
-            division_count = 0
-
+            div_count = 0
             for uid in sorted(new_stats.keys()):
                 start, end = new_stats[uid]
                 parent = int(self.lineage_data.get(uid, 0))
-
                 if parent != 0 and parent not in new_stats:
                     self.log_message(
-                        f"Warning: Orphan ID {uid} (Parent {parent} missing), reset parent to 0",
-                        "warning",
+                        f"Warning: Orphan ID {uid} (Parent {parent} missing)", "warning"
                     )
                     parent = 0
-
                 if parent > 0:
-                    division_count += 1
-
+                    div_count += 1
                 tlines.append([uid, start, end, parent])
 
-            # 3. Write TXT
             df = pd.DataFrame(tlines)
             df.to_csv(output_dir / "man_track.txt", sep=" ", index=False, header=False)
 
             self.track_stats = new_stats
-
             msg = (
-                f"✅ Data sync successful!\n"
-                f"Directory: {output_dir.name}\n"
+                f"✅ Data Sync Successful!\n"
+                f"Dir: {output_dir.name}\n"
                 f"Total Tracks: {len(tlines)}\n"
-                f"Divisions: {division_count}"
+                f"Divisions: {div_count}"
             )
-
             self.log_message(
-                f"Save complete! Tracks: {len(tlines)}, Divisions: {division_count}",
+                f"Save complete! Tracks: {len(tlines)}, Divisions: {div_count}",
                 "success",
             )
-            self.log_message(f"Location: {output_dir / 'man_track.txt'}", "info")
-
-            QMessageBox.information(self, "Save Confirmation", msg)
+            QMessageBox.information(self, "Save Confirmed", msg)
 
         except Exception as e:
             err_msg = f"Save failed: {str(e)}"
             self.log_message(err_msg, "error")
             QMessageBox.critical(self, "Error", err_msg)
 
-    def _recompute_stats_simple(self):
-        """Lightweight stats recomputation"""
-        new_stats = {}
-        f2ids = {t: [] for t in range(len(self.labels_layer.data))}
-        for t, frame in enumerate(self.labels_layer.data):
-            uids = np.unique(frame)
-            uids = uids[uids > 0]
-            f2ids[t] = [int(u) for u in uids]
-            for u in uids:
-                u = int(u)
-                if u not in new_stats:
-                    new_stats[u] = [t, t]
-                else:
-                    new_stats[u][1] = t
-        self.track_stats = new_stats
-        self.frame_to_ids = f2ids
-
     def save_overwrite(self):
         if not self.data_path:
-            self.log_message("Data not loaded, cannot overwrite", "warning")
+            self.log_message("No data loaded, cannot overwrite.", "warning")
             return
-        self._execute_save(self.data_path / "RES_modified")
+        self._execute_save(self.data_path.parent / "RES_modified")
 
     def save_as(self):
-        p = QFileDialog.getExistingDirectory(self, "Select Save Location")
+        p = QFileDialog.getExistingDirectory(self, "Select Save Directory")
         if p:
             self._execute_save(Path(p))

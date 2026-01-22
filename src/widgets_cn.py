@@ -550,6 +550,7 @@ class CTCEditorWidget(QWidget):
         self.update_tracks_layer()
         self.log_message("已撤销上一步操作", "info")
 
+    # --- [修改 3]：更新合并操作，使用新的刷新函数 ---
     def merge_tracks_action(self):
         id_keep, id_src = self.spin_m_keep.value(), self.spin_m_del.value()
         if id_keep == 0 or id_src == 0 or id_keep == id_src:
@@ -558,61 +559,177 @@ class CTCEditorWidget(QWidget):
 
         self._save_history()
 
-        # 逻辑不变：修改像素
+        # 修改像素
         self.labels_layer.data[self.labels_layer.data == id_src] = id_keep
         self.labels_layer.refresh()
 
-        # 逻辑不变：继承分裂关系
-        if id_src in self.lineage_data:
-            parent_id = self.lineage_data.pop(id_src)
-            self.lineage_data[id_keep] = parent_id
+        # 继承分裂关系：如果被合并的 id_src 有子节点，现在归 id_keep
+        for child, parent in list(self.lineage_data.items()):
+            if parent == id_src:
+                self.lineage_data[child] = id_keep
 
-        # 逻辑不变：重新扫描
-        self._recompute_stats_simple()
+        # 如果 id_src 自己有父节点，逻辑比较复杂，通常合并后 id_keep 保持原父节点
+        # 这里简单处理：移除 id_src 的记录
+        if id_src in self.lineage_data:
+            self.lineage_data.pop(id_src)
+
+        # [重要] 调用新的全量刷新，确保 id_src 的标签消失，id_keep 的轨迹延长
+        self._refresh_cache_from_memory()
+
         self.update_info_table()
         self.update_tracks_layer()
         self.log_message(f"合并成功: 将 ID {id_src} 合并入 ID {id_keep}", "success")
 
+    # --- [修改 1]：修复拆分逻辑，增加子代继承转移 ---
     def split_track_action(self):
         old_id, t_start = self.spin_s_id.value(), self.spin_s_time.value()
         if old_id == 0 or old_id not in self.track_stats:
             self.log_message("拆分失败：ID 不存在", "error")
             return
+
+        # 1. 保存历史用于撤销
         self._save_history()
+
+        # 2. 生成新 ID 并修改像素
         new_id = int(max(self.track_stats.keys()) + 1)
+
+        # 获取从 t_start 开始的数据切片
+        # 注意：这里我们修改的是内存中的数据，不会立即影响磁盘文件
         data_view = self.labels_layer.data[t_start:, ...]
-        data_view[data_view == old_id] = new_id
-        self.labels_layer.refresh()
-        old_end = self.track_stats[old_id][1]
-        self.track_stats[old_id][1] = t_start - 1
-        self.track_stats[new_id] = [t_start, old_end]
+        mask_to_change = data_view == old_id
+
+        if not np.any(mask_to_change):
+            self.log_message(
+                f"警告：在帧 {t_start} 之后未找到 ID {old_id} 的像素", "warning"
+            )
+            return
+
+        data_view[mask_to_change] = new_id
+        self.labels_layer.refresh()  # 刷新图层像素显示
+
+        # 3. [核心修复]：转移子代关系 (Lineage Inheritance)
+        # 遍历所有谱系关系，如果发现某个子细胞的父节点是 old_id
+        # 且该子细胞出现的时间在拆分点 t_start 之后（或等于），则将其父节点改为 new_id
+        updated_children = []
+        for child_id, parent_id in list(self.lineage_data.items()):
+            if parent_id == old_id:
+                # 获取子细胞的起始时间
+                child_start_frame = self.track_stats.get(child_id, [0, 0])[0]
+
+                # 如果子细胞是在拆分时间点之后出现的，说明它应该属于新的一半
+                if child_start_frame >= t_start:
+                    self.lineage_data[child_id] = new_id
+                    updated_children.append(str(child_id))
+
+        # 4. [核心修复]：调用全量内存刷新，更新质心和统计，解决显示不更新的问题
+        self._refresh_cache_from_memory()
+
+        # 5. UI 反馈
         self.update_info_table()
         self.update_tracks_layer()
-        self.log_message(
-            f"拆分成功: ID {old_id} 从帧 {t_start} 拆分为新 ID {new_id}", "success"
-        )
 
+        msg = f"拆分成功: ID {old_id} -> 新 ID {new_id} (帧 {t_start})"
+        if updated_children:
+            msg += f" | 已转移子细胞: {', '.join(updated_children)}"
+        self.log_message(msg, "success")
+
+    # --- [修改 2]：新增全量内存刷新函数，替代简单的 _recompute_stats_simple ---
+    def _refresh_cache_from_memory(self):
+        """
+        从当前的 labels_layer 内存数据中完全重新计算：
+        1. track_stats (Start, End)
+        2. centroids_cache (Frame, ID) -> (y, x) 用于绘图
+        3. frame_to_ids 用于查询
+
+        解决修改像素后，轨迹和文字标签不更新的问题。
+        """
+        self.log_message("正在刷新内存缓存...", "info")
+
+        mask_data = self.labels_layer.data
+        num_frames = mask_data.shape[0]
+
+        new_stats = {}
+        new_cents = {}
+        new_f2ids = {t: [] for t in range(num_frames)}
+
+        # 使用 scipy.ndimage 逐帧计算质心，速度尚可
+        for t in range(num_frames):
+            frame = mask_data[t]
+            uids = np.unique(frame)
+            uids = uids[uids > 0]  # 排除背景 0
+
+            if len(uids) == 0:
+                continue
+
+            new_f2ids[t] = [int(u) for u in uids]
+
+            # 计算该帧所有 ID 的质心
+            # center_of_mass 返回 [(y1, x1), (y2, x2), ...]
+            # index 参数传入 uids 列表，确保顺序对应
+            centers = center_of_mass(frame, frame, uids)
+
+            for idx, uid in enumerate(uids):
+                uid = int(uid)
+                y, x = centers[idx]
+
+                # 更新质心缓存
+                new_cents[(t, uid)] = (y, x)
+
+                # 更新统计 (Start, End)
+                if uid not in new_stats:
+                    new_stats[uid] = [t, t]
+                else:
+                    # Start 保持不变 (第一次遇到就是Start)，End 更新为当前 t
+                    new_stats[uid][1] = t
+
+        # 更新类成员变量
+        self.track_stats = new_stats
+        self.centroids_cache = new_cents
+        self.frame_to_ids = new_f2ids
+
+        # 顺便清理一下 lineage_data，移除不存在的 ID
+        valid_ids = set(new_stats.keys())
+        keys_to_remove = [k for k in self.lineage_data if k not in valid_ids]
+        for k in keys_to_remove:
+            del self.lineage_data[k]
+
+        self.log_message("内存缓存刷新完成", "info")
+
+    # --- [修改 4]：更新删除操作，使用新的刷新函数 ---
     def delete_track_globally(self):
         tid = self.spin_target_del.value()
         if tid == 0:
             return
         self._save_history()
+
         self.labels_layer.data[self.labels_layer.data == tid] = 0
         self.labels_layer.refresh()
-        self.track_stats.pop(tid, None)
+
+        # 清理 lineage
+        if tid in self.lineage_data:
+            del self.lineage_data[tid]
+
+        # [重要] 全量刷新
+        self._refresh_cache_from_memory()
+
         self.update_info_table()
         self.update_tracks_layer()
-        self.log_message(f"已物理删除 ID {tid} 的所有像素", "warning")
+        self.log_message(f"已物理删除 ID {tid}", "warning")
 
+    # --- [修改 5]：更新截断删除操作 ---
     def delete_track_afterwards(self):
         tid, t_curr = self.spin_target_del.value(), self.viewer.dims.current_step[0]
         if tid == 0:
             return
         self._save_history()
+
+        # 将 t_curr 及之后的该 ID 像素置 0
         self.labels_layer.data[t_curr:][self.labels_layer.data[t_curr:] == tid] = 0
         self.labels_layer.refresh()
-        if tid in self.track_stats:
-            self.track_stats[tid][1] = t_curr - 1
+
+        # [重要] 全量刷新 (因为 End time 变了，且之后的质心需要移除)
+        self._refresh_cache_from_memory()
+
         self.update_info_table()
         self.update_tracks_layer()
         self.log_message(f"已截断删除 ID {tid} (从帧 {t_curr} 开始)", "warning")
@@ -747,7 +864,7 @@ class CTCEditorWidget(QWidget):
         if not self.data_path:
             self.log_message("未加载数据，无法覆盖保存", "warning")
             return
-        self._execute_save(self.data_path / "RES_modified")
+        self._execute_save(self.data_path.parent / "RES_modified")
 
     def save_as(self):
         p = QFileDialog.getExistingDirectory(self, "选择保存位置")
